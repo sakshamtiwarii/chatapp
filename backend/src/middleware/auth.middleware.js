@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { User} from "../models/user.model.js";
+import redis from "../lib/redis.js";
 
 export const authMiddleware = async (req, res, next) => {
     try {
@@ -12,14 +13,21 @@ export const authMiddleware = async (req, res, next) => {
         if (!decoded || !decoded.userId) {
             return res.status(401).json({ message: "Unauthorized- invalid token" });
         }
-        
-        const user = await User.findById(decoded.userId).select("-password");
-        if (!user) {
-            return res.status(401).json({ message: "Unauthorized- user not found" });
-        }
 
-        req.user = user; // Attach user to request object
-        next();
+        const cachedUser = await redis.get("user:" + decoded.userId);
+
+        if (cachedUser) {
+            req.user = JSON.parse(cachedUser);
+            return next();
+        } else {
+            const user = await User.findById(decoded.userId).select("-password");
+            if (!user) {
+                return res.status(401).json({ message: "Unauthorized- user not found" });
+            }
+            await redis.set("user:" + decoded.userId, JSON.stringify(user), "EX", 3600); // Cache user data for 1 hour
+            req.user = user; // Attach user to request object
+            return next();
+        }
     } catch (error) {
         res.status(500).json({ message: "Error authenticating user", error: error.message });
     }

@@ -9,6 +9,7 @@
 ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Socket.io](https://img.shields.io/badge/Socket.io-010101?style=for-the-badge&logo=socketdotio&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
 </div>
@@ -24,6 +25,7 @@
 - **Profile customization** — upload and update your profile picture
 - **32 themes** — choose from a full palette of UI themes (dark, light, synthwave, cyberpunk, and more)
 - **Responsive design** — works on desktop and mobile screens
+- **Redis caching** — faster API responses with cached auth, sidebar users, and conversation history
 
 ---
 
@@ -39,6 +41,7 @@
 | bcryptjs | Password hashing |
 | Cloudinary | Image upload and storage |
 | cookie-parser | HTTP cookie middleware |
+| Redis + ioredis | Caching and online user presence |
 
 ### Frontend
 | Technology | Purpose |
@@ -67,7 +70,8 @@ ChatApp/
 │       ├── lib/
 │       │   ├── cloudinary.js           # Cloudinary config
 │       │   ├── db.js                   # MongoDB connection
-│       │   ├── socket.js               # Socket.io server + online user tracking
+│       │   ├── redis.js                # Redis client (ioredis)
+│       │   ├── socket.js               # Socket.io server + online user tracking via Redis
 │       │   └── util.js                 # JWT token generation
 │       ├── middleware/
 │       │   └── auth.middleware.js      # Route protection via JWT
@@ -110,6 +114,7 @@ ChatApp/
 
 - [Node.js](https://nodejs.org/) v18+
 - [MongoDB](https://www.mongodb.com/) — local or Atlas cluster
+- [Redis](https://redis.io/) — local instance (`brew install redis` on macOS)
 - [Cloudinary](https://cloudinary.com/) account — for image uploads
 
 ### 1. Clone the repository
@@ -136,6 +141,9 @@ NODE_ENV=development
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
 ```
 
 Install dependencies and start:
@@ -204,6 +212,18 @@ Chatty ships with **32 built-in themes** via daisyUI. Switch between them anytim
 2. Every protected request passes through `auth.middleware.js`, which verifies the token and attaches `req.user`
 3. On logout, the cookie is cleared server-side
 4. Socket connections authenticate by passing `userId` in the handshake query
+
+---
+
+## ⚡ Redis Caching Strategy
+
+| What | Cache Key | TTL | Invalidation |
+|---|---|---|---|
+| Authenticated user | `user:{userId}` | 1 hour | On logout / profile update |
+| Sidebar user list | `sidebar:{userId}` | 60 seconds | Auto-expires |
+| Conversation messages | `messages:{id1}:{id2}` | 5 minutes | Deleted on new message |
+| Online user socket | `socket:{userId}` | Session | Deleted on disconnect |
+| Online users set | `onlineUsers` | Session | Updated on connect/disconnect |
 
 ---
 
